@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AIM BLAST — Preview</title>
+  <style>
+    body { margin:0; background:#111; color:#fff; font-family:Arial, sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; }
+    #game { width:800px; height:600px; background: linear-gradient(#0b2540,#042033); position:relative; overflow:hidden; border:4px solid #222; }
+    #hud { position:absolute; left:10px; top:10px; z-index:20; }
+    #high { position:absolute; right:10px; top:10px; z-index:20; }
+    .target { position:absolute; border-radius:50%; background: radial-gradient(circle at 30% 30%, #fff, #ff6b6b); touch-action: none; }
+    #cross { position:absolute; width:32px; height:32px; pointer-events:none; z-index:30; transform:translate(-50%,-50%); }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="hud">Score: <span id="score">0</span></div>
+    <div id="high">High Score: <span id="highScore">0</span></div>
+    <img id="cross" src="" alt="+" />
+  </div>
+
+  <script>
+    // Initialize high score display to 0 immediately (MANDATORY)
+    document.getElementById('highScore').textContent = '0';
+
+    const game = document.getElementById('game');
+    const scoreEl = document.getElementById('score');
+    const highEl = document.getElementById('highScore');
+    const cross = document.getElementById('cross');
+    cross.style.background = 'transparent';
+    cross.style.border = '2px solid white';
+    cross.style.borderRadius = '50%';
+
+    let score = 0;
+    let highScore = 0;
+    let hits = 0;
+    let shots = 0;
+
+    // Request data from parent (Applaa)
+    function requestGameData(){
+      const gameId = 'aim_blast_game';
+      window.parent.postMessage({ type: 'applaa-game-load-data', gameId: gameId }, '*');
+    }
+
+    // Listen for Applaa responses
+    window.addEventListener('message', (e) => {
+      if(!e.data) return;
+      if(e.data.type === 'applaa-game-data-loaded'){
+        const data = e.data.data || {};
+        highScore = data.highScore || 0;
+        document.getElementById('highScore').textContent = highScore;
+        const lastName = data.lastPlayerName || '';
+        // optionally pre-fill name in real wrapper
+      }
+    });
+
+    // Fallback: simulate parent localStorage response after short delay (for preview)
+    setTimeout(()=> {
+      // Simulate loading saved data from localStorage under key applaa-game-data-aim_blast_game
+      try {
+        const raw = localStorage.getItem('applaa-game-data-aim_blast_game');
+        if(raw){
+          const parsed = JSON.parse(raw);
+          if(parsed.highScore) {
+            highScore = parsed.highScore;
+            highEl.textContent = highScore;
+          }
+        }
+      } catch(e){}
+    }, 50);
+
+    requestGameData();
+
+    // Spawn targets
+    function spawnTarget(){
+      const t = document.createElement('div');
+      const size = 60 + Math.random()*40;
+      t.className = 'target';
+      t.style.width = size + 'px';
+      t.style.height = size + 'px';
+      t.style.left = (Math.random()*(game.clientWidth - size)) + 'px';
+      t.style.top = (Math.random()*(game.clientHeight - size)) + 'px';
+      t.dataset.size = size;
+      game.appendChild(t);
+
+      // Shrink over time
+      let cur = size;
+      const shrink = setInterval(()=>{
+        cur -= 1.2;
+        if(cur <= 8){
+          clearInterval(shrink);
+          if(game.contains(t)) game.removeChild(t);
+        } else {
+          t.style.width = cur + 'px';
+          t.style.height = cur + 'px';
+        }
+      }, 33);
+
+      // Click/tap handler
+      t.addEventListener('pointerdown', (ev)=>{
+        ev.stopPropagation();
+        shots++;
+        hits++;
+        score += 10;
+        scoreEl.textContent = score;
+        if(score > highScore) {
+          highScore = score;
+          highEl.textContent = highScore;
+        }
+        // Save score to applaa/localStorage
+        saveScore('Player', score);
+        // remove target
+        clearInterval(shrink);
+        if(game.contains(t)) game.removeChild(t);
+      }, {passive:true});
+    }
+
+    // spawn loop
+    setInterval(()=>{
+      if(document.querySelectorAll('.target').length < 4) spawnTarget();
+    }, 800);
+
+    // crosshair follow
+    game.addEventListener('pointermove', (e)=>{
+      const rect = game.getBoundingClientRect();
+      cross.style.left = (e.clientX - rect.left) + 'px';
+      cross.style.top = (e.clientY - rect.top) + 'px';
+    });
+
+    // click on empty space counts as shot
+    game.addEventListener('pointerdown', (e)=>{
+      const rect = game.getBoundingClientRect();
+      shots++;
+      // If clicked a target, target handler increments hits; otherwise record miss (no health in preview)
+    });
+
+    // Save score to parent
+    function saveScore(playerName, scoreVal){
+      const gameId = 'aim_blast_game';
+      // Send message to parent
+      window.parent.postMessage({ type: 'applaa-game-save-score', gameId: gameId, playerName: playerName, score: scoreVal }, '*');
+      // Also store locally for preview
+      try {
+        let data = { gameId: gameId, highScore: Math.max(scoreVal, highScore), lastPlayerName: playerName, scores: [{ playerName: playerName, score: scoreVal, timestamp: (new Date()).toISOString() }] };
+        localStorage.setItem('applaa-game-data-' + gameId, JSON.stringify(data));
+      } catch(e){}
+    }
+
+    // For demo: show crosshair at center initially
+    cross.style.left = '50%';
+    cross.style.top = '50%';
+  </script>
+</body>
+</html>

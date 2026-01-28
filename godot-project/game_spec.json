@@ -1,0 +1,28 @@
+{
+  "game": {
+    "name": "AIM BLAST",
+    "type": "2D",
+    "genre": "arcade",
+    "description": "Arcade aim game: hit shrinking targets quickly to score. Tap on mobile or click with mouse."
+  },
+  "settings": {
+    "window": { "width": 1024, "height": 768 },
+    "physics": { "gravity": 0 }
+  },
+  "player": {
+    "name": "Player",
+    "health": 3,
+    "speed": 0,
+    "abilities": ["aim"]
+  },
+  "entities": {
+    "targets": [
+      { "name": "Target", "value": 10, "behavior": "shrink_over_time" }
+    ]
+  },
+  "logic": {
+    "winCondition": "reach_goal",
+    "loseCondition": "health_zero",
+    "scoring": { "pointsPerHit": 10 }
+  }
+}
